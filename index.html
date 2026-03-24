@@ -432,6 +432,7 @@ function quickAsk(text) {
 async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
+
   appendMessage(text, 'user');
   input.value = '';
   showTyping(true);
@@ -452,18 +453,38 @@ async function sendMessage() {
       })
     });
 
-    const data = await response.json().catch(() => ({}));
+    let payload;
+    const contentType = response.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      payload = await response.json();
+    } else {
+      const textResponse = await response.text();
+      payload = { message: textResponse };
+    }
+
+    console.log('n8n response payload:', payload);
     showTyping(false);
 
     const reply =
-      data.output ??
-      data.answer ??
-      data.response ??
-      data.message ??
-      (Array.isArray(data) && data[0] && (data[0].output || data[0].answer)) ??
+      payload?.message ??
+      payload?.output ??
+      payload?.reply ??
+      payload?.response ??
+      payload?.answer ??
+      (Array.isArray(payload) && payload[0] && (
+        payload[0].message ??
+        payload[0].output ??
+        payload[0].reply ??
+        payload[0].response ??
+        payload[0].answer
+      )) ??
+      (typeof payload === 'string' ? payload : '') ??
       'I’m sorry, but I could not read a response from the chatbot service.';
+
     appendMessage(String(reply), 'bot');
   } catch (error) {
+    console.error('Chat error:', error);
     showTyping(false);
     appendMessage('Connection issue. Please try again in a moment.', 'bot');
   }
