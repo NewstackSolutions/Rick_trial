@@ -452,23 +452,49 @@ async function sendMessage() {
       })
     });
 
-    const data = await response.json().catch(() => ({}));
-    showTyping(false);
+    try {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'sendMessage',
+      sessionId,
+      chatInput: text,
+      metadata: {
+        portal: 'New Zealand Infrastructure Commission',
+        brand: 'Rick',
+        source: 'GitHub landing page'
+      }
+    })
+  });
 
-    const reply =
-      data.output ??
-      data.answer ??
-      data.response ??
-      data.message ??
-      (Array.isArray(data) && data[0] && (data[0].output || data[0].answer)) ??
-      'I’m sorry, but I could not read a response from the chatbot service.';
-    appendMessage(String(reply), 'bot');
-  } catch (error) {
-    showTyping(false);
-    appendMessage('Connection issue. Please try again in a moment.', 'bot');
+  let payload;
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    payload = await response.json();
+  } else {
+    const textResponse = await response.text();
+    payload = { message: textResponse };
   }
-}
 
+  console.log('n8n response payload:', payload);
+
+  const botReply =
+    payload?.message ??
+    payload?.output ??
+    payload?.reply ??
+    payload?.response ??
+    payload?.answer ??
+    (typeof payload === 'string' ? payload : '') ??
+    '';
+
+  addMessage(botReply || 'No response', 'bot');
+
+} catch (err) {
+  console.error('Chat error:', err);
+  addMessage('Connection issue. Please try again.', 'bot');
+}
 input.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') sendMessage();
 });
