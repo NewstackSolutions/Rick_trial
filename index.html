@@ -437,59 +437,49 @@ async function sendMessage() {
   input.value = '';
   showTyping(true);
 
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'sendMessage',
-        sessionId,
-        chatInput: text,
-        metadata: {
-          portal: 'New Zealand Infrastructure Commission',
-          brand: 'Rick',
-          source: 'GitHub landing page'
-        }
-      })
-    });
-
-    let payload;
-    const contentType = response.headers.get('content-type') || '';
-
-    if (contentType.includes('application/json')) {
-      payload = await response.json();
-    } else {
-      const textResponse = await response.text();
-      payload = { message: textResponse };
+  const response = await fetch(endpoint, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    action: 'sendMessage',
+    sessionId,
+    chatInput: text,
+    metadata: {
+      portal: 'New Zealand Infrastructure Commission',
+      brand: 'Rick',
+      source: 'GitHub landing page'
     }
+  })
+});
 
-    console.log('n8n response payload:', payload);
-    showTyping(false);
+// 🔥 IMPORTANT FIX STARTS HERE
+let replyText;
 
-    const reply =
-      payload?.message ??
-      payload?.output ??
-      payload?.reply ??
-      payload?.response ??
-      payload?.answer ??
-      (Array.isArray(payload) && payload[0] && (
-        payload[0].message ??
-        payload[0].output ??
-        payload[0].reply ??
-        payload[0].response ??
-        payload[0].answer
-      )) ??
-      (typeof payload === 'string' ? payload : '') ??
-      'I’m sorry, but I could not read a response from the chatbot service.';
+try {
+  const contentType = response.headers.get('content-type') || '';
 
-    appendMessage(String(reply), 'bot');
-  } catch (error) {
-    console.error('Chat error:', error);
-    showTyping(false);
-    appendMessage('Connection issue. Please try again in a moment.', 'bot');
+  if (contentType.includes('application/json')) {
+    const data = await response.json();
+    replyText =
+      data?.message ||
+      data?.output ||
+      data?.reply ||
+      data?.response ||
+      data?.answer;
+  } else {
+    replyText = await response.text();
   }
+
+} catch (e) {
+  replyText = "Sorry, something went wrong.";
 }
 
+// fallback safety
+if (!replyText || replyText === 'false') {
+  replyText = "Sorry, I couldn't process that. Could you try again?";
+}
+
+addMessage(replyText, 'bot');
 input.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') sendMessage();
 });
